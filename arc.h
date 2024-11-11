@@ -49,7 +49,7 @@ struct arc_s {
   struct arc_status_s gmfu;
   struct arc_status_s gmru;
   unsigned int p;
-  unsigned int cache;
+  unsigned int ce; /* Number of cache entrys */
 };
 
 void arc_dump(struct arc_s *arc);

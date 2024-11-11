@@ -179,7 +179,7 @@ void arc_update(struct arc_s *cache, struct arc_object_s *obj, eARCType type) {
     cache->ops->evacuate(obj);
   } else if (obj->type != GMRU || obj->type == GMFU || obj->type == None) {
     /* This is the case where we want to move from the Ghost list back to the normal cache list */
-    while (cache->mru.size + cache->mfu.size >= cache->cache) {
+    while (cache->mru.size + cache->mfu.size >= cache->ce) {
       struct arc_object_s *removed = NULL;
       if (cache->mru.size > cache->p) {
         /* Remove an object from MRU and move it to the Ghost List */
@@ -199,7 +199,7 @@ void arc_update(struct arc_s *cache, struct arc_object_s *obj, eARCType type) {
     }
 
     /* Balance Ghost List */
-    while (cache->gmfu.size + cache->gmru.size > cache->cache) {
+    while (cache->gmfu.size + cache->gmru.size > cache->ce) {
       struct arc_object_s *removed = NULL;
       if (cache->gmru.size > cache->p) {
         removed = arc_remove_from(cache, GMRU);
@@ -287,7 +287,7 @@ struct arc_object_s *arc_lookup(struct arc_s *cache, const void *key) {
     if (obj->type == GMFU) {
       cache->p = ARC_MAX(0, cache->p - ARC_MAX(cache->gmru.size / cache->gmfu.size, 1));
     } else if (obj->type == GMRU) {
-      cache->p = ARC_MIN(cache->cache, cache->p + ARC_MAX(cache->gmfu.size / cache->gmru.size, 1));
+      cache->p = ARC_MIN(cache->ce, cache->p + ARC_MAX(cache->gmfu.size / cache->gmru.size, 1));
     } else {
       arc_assert(false);
     }
@@ -337,8 +337,8 @@ struct arc_s *arc_create(struct arc_ops_s *ops, unsigned int cache_size) {
   arc_status_init(&cache->gmru, GMRU);
   arc_status_init(&cache->gmfu, GMFU);
 
-  cache->cache = cache_size;
-  cache->p = cache->cache >> 1;
+  cache->ce = cache_size;
+  cache->p = cache->ce >> 1;
   cache->ops = ops;
   return cache;
 }
