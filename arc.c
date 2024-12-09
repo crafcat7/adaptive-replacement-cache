@@ -170,14 +170,13 @@ void arc_update(struct arc_s *cache, struct arc_object_s *obj, eARCType type) {
 
   if (type == None) {
     /* This object is going to be removed from the cache */
+    arc_list_remove(&obj->list);
     cache->ops->destroy(obj);
-  }
-
-  /* Check if the Object is already in or about to enter the Ghost List */
-  if (type == GMFU || type == GMRU) {
+    return;
+  } else if (type == GMFU || type == GMRU) {
     /* The element will be moved to the Ghost List, so it will be ready to be evicted from the Cache */
     cache->ops->evacuate(obj);
-  } else if (obj->type != GMRU || obj->type == GMFU || obj->type == None) {
+  } else if (obj->type != MRU && obj->type != MFU) {
     /* This is the case where we want to move from the Ghost list back to the normal cache list */
     while (cache->mru.size + cache->mfu.size >= cache->ce) {
       struct arc_object_s *removed = NULL;
