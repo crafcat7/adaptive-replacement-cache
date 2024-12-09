@@ -175,8 +175,9 @@ static void arc_update(struct arc_s *cache, struct arc_object_s *obj, eARCType t
   } else if (type == GMFU || type == GMRU) {
     /* The element will be moved to the Ghost List, so it will be ready to be evicted from the Cache */
     cache->ops->evacuate(obj);
-  } else {
-    /* This is the case where we want to move from the Ghost list back to the normal cache list */
+  } else if (obj->type == None || ((obj->type == GMFU || obj->type == GMRU) &&
+            (type == MRU || type == MFU))) {
+    /* In this case, we want to move from the Ghost list back to the normal cache list, or there is a new obj insert */
     while (cache->mru.size + cache->mfu.size >= cache->ce) {
       struct arc_object_s *removed = NULL;
       if (cache->mru.size > cache->p) {
@@ -245,7 +246,7 @@ struct arc_object_s *arc_search(struct arc_s *cache, const void *key) {
 
   for (list_node = cache->gmru.objects.list.next; list_node != &cache->gmru.objects.list; list_node = list_node->next) {
     struct arc_object_s *obj = arc_container_of(list_node, struct arc_object_s, list);
-    if (cache->ops->cmp(key, obj) == 0) {
+    if (cache->ops->cmp(key, obj) == 0) { 
       return obj;
     }
   }
