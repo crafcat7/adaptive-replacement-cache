@@ -32,7 +32,7 @@ static inline void arc_list_remove(struct arc_list_s *node) {
   node->prev = node->next = NULL;
 }
 
-static inline void dump_list(struct arc_list_s *list) {
+static inline void arc_dumplist(struct arc_list_s *list) {
   struct arc_list_s *current = list->next;
   if (current == list) {
     printf("List is empty.\n");
@@ -175,7 +175,7 @@ static void arc_update(struct arc_s *cache, struct arc_object_s *obj, eARCType t
   } else if (type == GMFU || type == GMRU) {
     /* The element will be moved to the Ghost List, so it will be ready to be evicted from the Cache */
     cache->ops->evacuate(obj);
-  } else if (obj->type != MRU && obj->type != MFU) {
+  } else {
     /* This is the case where we want to move from the Ghost list back to the normal cache list */
     while (cache->mru.size + cache->mfu.size >= cache->ce) {
       struct arc_object_s *removed = NULL;
@@ -347,14 +347,14 @@ struct arc_s *arc_create(struct arc_ops_s *ops, unsigned int cache_size) {
 
 void arc_dump(struct arc_s *arc) {
   printf("MRU List size[%d]:\n",arc->mru.size);
-  dump_list(&arc->mru.objects.list);
+  arc_dumplist(&arc->mru.objects.list);
 
   printf("MFU List size[%d]:\n",arc->mfu.size);
-  dump_list(&arc->mfu.objects.list);
+  arc_dumplist(&arc->mfu.objects.list);
 
   printf("GMFU List size[%d]:\n",arc->gmfu.size);
-  dump_list(&arc->gmfu.objects.list);
+  arc_dumplist(&arc->gmfu.objects.list);
 
   printf("GMRU List:[%d]:\n",arc->gmru.size);
-  dump_list(&arc->gmru.objects.list);
+  arc_dumplist(&arc->gmru.objects.list);
 }
