@@ -75,7 +75,7 @@ static void arc_status_init(struct arc_status_s *status, eARCType type) {
  * arc_remove_from
  ****************************************/
 
-struct arc_object_s *arc_remove_from(struct arc_s *cache, eARCType type) {
+static struct arc_object_s *arc_remove_from(struct arc_s *cache, eARCType type) {
   struct arc_object_s *remove = NULL;
   struct arc_list_s *head = NULL;
 
@@ -121,7 +121,7 @@ struct arc_object_s *arc_remove_from(struct arc_s *cache, eARCType type) {
  * arc_insert_to
  ****************************************/
 
-void arc_insert_to(struct arc_s *cache, struct arc_object_s *obj, eARCType type) {
+static void arc_insert_to(struct arc_s *cache, struct arc_object_s *obj, eARCType type) {
   switch (obj->type) {
     case MRU: cache->mru.size--; break;
     case MFU: cache->mfu.size--; break;
@@ -162,7 +162,7 @@ void arc_insert_to(struct arc_s *cache, struct arc_object_s *obj, eARCType type)
  * arc_update
  ****************************************/
 
-void arc_update(struct arc_s *cache, struct arc_object_s *obj, eARCType type) {
+static void arc_update(struct arc_s *cache, struct arc_object_s *obj, eARCType type) {
   if (obj->type != None) {
     /* Let's take that element out of the original chain first */
     arc_list_remove(&obj->list);
