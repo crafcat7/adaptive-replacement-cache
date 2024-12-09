@@ -170,7 +170,6 @@ void arc_update(struct arc_s *cache, struct arc_object_s *obj, eARCType type) {
 
   if (type == None) {
     /* This object is going to be removed from the cache */
-    arc_list_remove(&obj->list);
     cache->ops->destroy(obj);
     return;
   } else if (type == GMFU || type == GMRU) {
