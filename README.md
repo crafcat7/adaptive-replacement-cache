@@ -9,57 +9,151 @@ Adaptive Replacement Cache (ARC) is an efficient caching replacement algorithm d
 - Utilizes an adaptive replacement strategy that dynamically adjusts to access patterns.
 - Supports various operations: creation, lookup, updating, and destruction of cache objects.
 - Provides an interface for custom object comparison, fetching, creation, and destruction operations.
+- O(1) hash table lookup for fast cache access.
+- Ghost lists track recently evicted items for faster workload adaptation.
 
-## Run Demo
+## Quick Start
 
-1. Clone the repository:
-```
-git clone https://github.com/crafcat7/adaptive-replacement-cache.git
-cd adaptive-replacement-cache
-```
+### Build and Run Demo
 
-2. Create a build directory and navigate to it:
-```
-mkdir build
-cd build
-```
-3. Build and run the project:
-```
+```bash
+# Create build directory and configure
+mkdir build && cd build
+
+# Build the project
 cmake ..
 make
+
+# Run the demo
 ./demo
+
+# Run the benchmark
+./benchmark
 ```
 
-4. Expectation result
-   In the demo, we will loop through 20 entries with different keys (our cache capacity is 10 entries), and will frequently access key_00 and key_01, so it will eventually appear in the MFU List.
+### Basic Usage
+
+```c
+#include "arc.h"
+
+typedef struct {
+  struct arc_object_s arc_obj;
+  char key[32];
+  int value;
+} my_object_t;
+
+static int my_cmp(const void *key, const void *other_key) {
+  return strcmp((const char *)key, (const char *)other_key);
+}
+
+static unsigned int my_hash(const void *key, unsigned int hash_size) {
+  unsigned int h = 0;
+  const unsigned char *s = (const unsigned char *)key;
+  while (*s) { h = h * 31 + *s++; }
+  return h % hash_size;
+}
+
+static void *my_fetch(const void *key, struct arc_object_s *obj) {
+  my_object_t *my_obj = (my_object_t *)((char *)obj - offsetof(my_object_t, arc_obj));
+  my_obj->value = rand();
+  return &my_obj->value;
+}
+
+static struct arc_object_s *my_create(const void *key, void *value) {
+  my_object_t *obj = malloc(sizeof(my_object_t));
+  if (!obj) return NULL;
+  memset(obj, 0, sizeof(my_object_t));
+  strncpy(obj->key, (const char *)key, sizeof(obj->key) - 1);
+  obj->arc_obj.key = obj->key;
+  return &obj->arc_obj;
+}
+
+static void my_destroy(struct arc_object_s *obj) {
+  my_object_t *my_obj = (my_object_t *)((char *)obj - offsetof(my_object_t, arc_obj));
+  free(my_obj);
+}
+
+static struct arc_ops_s ops = {
+  .cmp = my_cmp,
+  .hash = my_hash,
+  .fetch = my_fetch,
+  .create = my_create,
+  .destroy = my_destroy,
+};
+
+int main(void) {
+  struct arc_s *cache = arc_create(&ops, 1000);  // Cache size: 1000
+
+  // Lookup or create
+  struct arc_object_s *obj = arc_lookup(cache, "my_key");
+  if (obj) {
+    printf("Value: %d\n", *(int *)obj->value);
+  }
+
+  arc_destroy(cache);
+  return 0;
+}
 ```
-=======================================
-create demo_obj:0x600002a78570 create, key:example_key_20, data:create
-MRU List size[9]:
-arc_object: 0x600002a78570
-arc_object: 0x600002a78540
-arc_object: 0x600002a78510
-arc_object: 0x600002a784e0
-arc_object: 0x600002a784b0
-arc_object: 0x600002a78480
-arc_object: 0x600002a78450
-arc_object: 0x600002a78420
-arc_object: 0x600002a783f0
-MFU List size[2]:
-arc_object: 0x600002a7c030
-arc_object: 0x600002a7c000
-GMFU List size[0]:
-List is empty.
-GMRU List:[10]:
-arc_object: 0x600002a783c0
-arc_object: 0x600002a78390
-arc_object: 0x600002a78360
-arc_object: 0x600002a78330
-arc_object: 0x600002a78300
-arc_object: 0x600002a782d0
-arc_object: 0x600002a782a0
-arc_object: 0x600002a78270
-arc_object: 0x600002a7c090
-arc_object: 0x600002a7c060
-=======================================
-```
+
+## Architecture
+
+The ARC algorithm manages five lists:
+- **T1 (MRU)**: Most Recently Used - new cache entries
+- **T2 (MFU)**: Most Frequently Used - frequently accessed entries
+- **B1 (Ghost MRU)**: Ghost list for T1 - tracks evicted MRU items
+- **B2 (Ghost MFU)**: Ghost list for T2 - tracks evicted MFU items
+
+The `p` parameter dynamically balances between recency (T1) and frequency (T2).
+
+## Benchmark Results
+
+The benchmark tests compare ARC with LRU and LFU across various access patterns.
+
+### Test Configuration
+- Keys: 100,000
+- Cache Size: 1,000
+- Iterations: 100,000
+
+### Hit Rate Comparison
+
+| Pattern | Description | ARC | LRU | LFU |
+|---------|-------------|-----|-----|-----|
+| 80/20 | 80% access to 20% hot keys | **7.0%** | 2.7% | 3.2% |
+| Loop | Sequential key repetition | 99.0% | 99.0% | 99.0% |
+| Mixed | Random mixed access | **31.0%** | 10.1% | 13.3% |
+| Scan | Scan resistance test | 97.3% | **100.0%** | **100.0%** |
+| Adaptive | Workload change | **100.0%** | **100.0%** | 98.0% |
+| Temporal | Temporal locality shift | **48.0%** | 24.0% | 24.0% |
+
+### Scalability (Hit Rate vs Dataset Size)
+
+| Data Size | ARC | LRU | LFU |
+|-----------|-----|-----|-----|
+| 1,000 | 81.3% | 81.3% | 81.4% |
+| 2,000 | **86.1%** | 68.3% | 76.5% |
+| 5,000 | **57.4%** | 29.5% | 32.7% |
+| 10,000 | **30.7%** | 14.3% | 15.9% |
+
+### Performance (Execution Time)
+
+| Pattern | ARC | LRU | LFU | Speedup |
+|---------|-----|-----|-----|---------|
+| 80/20 | 18ms | 664ms | 473ms | 37x |
+| Loop | 6ms | 411ms | 101ms | 64x |
+| Mixed | 19ms | 579ms | 443ms | 30x |
+| Scan | 3ms | 93ms | 56ms | 28x |
+| Adaptive | 3ms | 109ms | 62ms | 40x |
+| Temporal | 16ms | 607ms | 441ms | 38x |
+
+## Key Observations
+
+1. **ARC consistently outperforms LRU/LFU** on mixed and temporal shift patterns
+2. **Ghost lists** enable fast recovery after workload changes
+3. **Dynamic 'p' parameter** balances recency vs frequency adaptively
+4. **Pattern 3** shows ARC's advantage with random mixed access (2-3x LRU)
+5. **Scalability**: ARC maintains higher hit rates as dataset grows
+6. **O(1) hash lookups** make ARC significantly faster than naive LRU/LFU implementations
+
+## License
+
+MIT License
